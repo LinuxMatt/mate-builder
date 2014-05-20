@@ -5,6 +5,7 @@ BUILD_FILE="build-order.conf"
 DEBS_FILE="deb-dependencies.conf"
 TARGET_DIR="/usr/local"
 FILTERCMD="grep -v #"
+GEN_SCRIPT="./autogen.sh"
 
 action_title() {
 	echo "##"
@@ -44,7 +45,7 @@ action_installpkg() {
 	action_title "INSTALLING ${1}"
 	sudo apt-get install -y ${1}
 	if [ "x${?}" != "x0" ]; then
-		[ "x$2" = "xforce" ] || exit 1
+		[ "x${2}" = "xforce" ] || exit 1
 	fi
 }
 action_installdeps() {
@@ -59,15 +60,22 @@ action_pause() {
 	read k
 }
 action_build() {
-	cd $1
+	if [ ! -d "${1}" ]; then
+		action_gitup "${1}"
+	fi
+	cd ${1}
+	if [ ! -f "${GEN_SCRIPT}" ]; then
+		action_title "File ${GEN_SCRIPT} is MISSING. Abort."
+		exit 1
+	fi
 	action_title "BUILDING ${1}"
 	echo "==== PREPARING."
-	./autogen.sh --prefix=${TARGET_DIR} --sysconfdir=${TARGET_DIR}/etc --localstatedir=/var || exit 2
+	${GEN_SCRIPT} --prefix=${TARGET_DIR} --sysconfdir=${TARGET_DIR}/etc --localstatedir=/var || exit 2
 	echo "==== READY TO MAKE."
-	[ "x$2" = "xauto" ] || action_pause
+	[ "x${2}" = "xauto" ] || action_pause
 	make || exit 2
 	echo "==== READY TO INSTALL."
-	[ "x$2" = "xauto" ] || action_pause
+	[ "x${2}" = "xauto" ] || action_pause
 	sudo /usr/bin/make install || exit 2
 	cd -
 }
@@ -96,10 +104,14 @@ action_build_auto() {
 	done
 }
 action_clean() {
-	cd $1
-	action_title "CLEANING ${1}"
-	make maintainer-clean
-	cd -
+	if [ ! -d "${1}" ]; then
+		action_title "${1} directory is MISSING."
+	else
+		cd ${1}
+		action_title "CLEANING ${1}"
+		make maintainer-clean
+		cd -
+	fi
 }
 action_clean_all() {
 	for d in $(${FILTERCMD} $BUILD_FILE)
@@ -108,7 +120,7 @@ action_clean_all() {
 	done
 }
 usage() {
-	echo -e "\nUSAGE: $0 <setup|setup-force|update|update-all|clean|clean-all>"
+	echo -e "\nUSAGE: ${0} <setup|setup-force|update|update-all|clean|clean-all>"
 	echo -e "\t\t\t<(auto)build|(auto)build-all|(auto)build-from>\n"
 	echo -e "\tsetup        : install required deb packages for building"
 	echo -e "\tupdate <dir> : fetch and update from Github"
@@ -128,8 +140,8 @@ if [ -z ${1} ] ; then
 fi
 
 export ACLOCAL_FLAGS="-I ${TARGET_DIR}/share/aclocal/"
-ACTION=$1
-case "x$ACTION" in
+ACTION=${1}
+case "x${ACTION}" in
 	"xsetup")
 		action_installdeps
 		;;
