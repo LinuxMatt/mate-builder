@@ -42,13 +42,16 @@ action_update_all() {
 }
 action_installpkg() {
 	action_title "INSTALLING ${1}"
-	sudo apt-get install -y ${1} || exit 1
+	sudo apt-get install -y ${1}
+	if [ "x${?}" != "x0" ]; then
+		[ "x$2" = "xforce" ] || exit 1
+	fi
 }
 action_installdeps() {
-	echo "Installing dependencies..."
+	action_title "INSTALLING DEPENDENCIES..."
 	for d in $(${FILTERCMD} ${DEBS_FILE})
 	do
-		action_installpkg "${d}"
+		action_installpkg "${d}" ${1}
 	done
 }
 action_pause() {
@@ -105,16 +108,17 @@ action_clean_all() {
 	done
 }
 usage() {
-	echo -e "\nUSAGE: $0 <setup|update|update-all|clean|clean-all>"
+	echo -e "\nUSAGE: $0 <setup|setup-force|update|update-all|clean|clean-all>"
 	echo -e "\t\t\t<(auto)build|(auto)build-all|(auto)build-from>\n"
 	echo -e "\tsetup        : install required deb packages for building"
 	echo -e "\tupdate <dir> : fetch and update from Github"
 	echo -e "\tbuild  <dir> : configure, compile and install to ${TARGET_DIR}"
 	echo -e "\tclean  <dir> : remove the files created by the 'build' action"
 	echo -e "\n\tOptional keywords:"
-	echo -e "\tall  : process all projects from file ${BUILD_FILE}"
-	echo -e "\tfrom : read list of projects from given <file>"
-	echo -e "\tauto : automatic build without user interaction"
+	echo -e "\tall   : process all projects from file ${BUILD_FILE}"
+	echo -e "\tfrom  : read list of projects from given <file>"
+	echo -e "\tauto  : automatic build without user interaction"
+	echo -e "\tforce : script will not stop on errors"
 	echo -e ""
 	exit 2
 }
@@ -128,6 +132,9 @@ ACTION=$1
 case "x$ACTION" in
 	"xsetup")
 		action_installdeps
+		;;
+	"xsetup-force")
+		action_installdeps force
 		;;
 	"xupdate")
 		[ -z ${2} ] && usage
